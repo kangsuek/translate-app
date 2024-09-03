@@ -5,7 +5,8 @@ from googletrans import Translator
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+# 'eventlet' 모드를 명시적으로 지정
+socketio = SocketIO(app, async_mode='eventlet')
 translator = Translator()
 
 UPLOAD_FOLDER = 'uploads/'
