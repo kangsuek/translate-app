@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Translation App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Upload File for Translation</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="fileInput" name="file">
+        <button type="submit">Upload</button>
+    </form>
+
+    <div id="progress"></div>
+    <div id="download-link"></div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const form = document.getElementById('uploadForm');
+        const progress = document.getElementById('progress');
+        const downloadLink = document.getElementById('download-link');
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    progress.innerText = 'File uploaded, waiting for translation...';
+                } else {
+                    progress.innerText = 'Failed to upload file.';
+                }
+            });
+        });
+
+        socket.on('progress', (data) => {
+            progress.innerText = data.data;
+            if (data.filename) {
+                downloadLink.innerHTML = `<a href="/download/${data.filename}">Download Translated File</a>`;
+            }
+        });
+    </script>
+</body>
+</html>
