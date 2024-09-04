@@ -14,7 +14,7 @@ thread_lock = Lock()  # 스레드 안전성을 위한 락 객체 생성
 # 파일 업로드 및 처리를 위한 디렉토리 설정
 UPLOAD_FOLDER = 'uploads/'
 PROCESSED_FOLDER = 'processed/'
-ALLOWED_EXTENSIONS = {'txt', 'str'}  # 허용된 파일 확장자
+ALLOWED_EXTENSIONS = {'txt'}  # 허용된 파일 확장자
 
 # 필요한 디렉토리 생성
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -60,11 +60,13 @@ def process_translation(filepath, filename):
             with open(filepath, 'r', encoding='utf-8') as f:
                 text = f.read()
 
-            socketio.emit('progress', {'data': 'Translating...'})
+            socketio.emit('progress', {'data': 'Translating...', 'percentage': 25})
 
             # Google Translator를 사용하여 번역
             translator = GoogleTranslator(source='auto', target='ko')
             translated_text = translator.translate(text)
+
+            socketio.emit('progress', {'data': 'Translation completed. Saving file...', 'percentage': 75})
 
             # 번역된 텍스트를 새 파일에 저장
             new_filename = os.path.splitext(filename)[0] + '_korean.txt'
@@ -73,9 +75,9 @@ def process_translation(filepath, filename):
             with open(new_filepath, 'w', encoding='utf-8') as f:
                 f.write(translated_text)
 
-            socketio.emit('progress', {'data': 'Translation Completed!', 'filename': new_filename})
+            socketio.emit('progress', {'data': 'Translation Completed!', 'filename': new_filename, 'percentage': 100})
         except Exception as e:
-            socketio.emit('progress', {'data': f'Error: {str(e)}'})
+            socketio.emit('progress', {'data': f'Error: {str(e)}', 'percentage': 0})
         finally:
             # 원본 업로드 파일 삭제
             os.remove(filepath)
