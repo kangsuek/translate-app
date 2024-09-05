@@ -11,9 +11,7 @@ const uploadBtn = document.getElementById('uploadBtn');
 
 let originalExtension = '';
 
-uploadBtn.addEventListener('click', () => {
-    fileInput.click();
-});
+uploadBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
@@ -25,12 +23,13 @@ fileInput.addEventListener('change', (e) => {
 });
 
 function uploadFile() {
-    const formData = new FormData();
     const file = fileInput.files[0];
     if (!file) {
         statusMessage.textContent = '번역할 파일을 업로드해 주세요.';
         return;
     }
+    
+    const formData = new FormData();
     formData.append('file', file);
     originalExtension = file.name.split('.').pop();
 
