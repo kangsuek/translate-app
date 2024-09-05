@@ -1,78 +1,28 @@
-<!-- index.html -->
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Translation App</title>
-    <!-- CSS 파일 링크 -->
+    <title>파일 번역 서비스</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Upload File for Translation</h1>
-    <!-- 파일 업로드 폼 -->
-    <form id="uploadForm" enctype="multipart/form-data">
-        <!-- 파일 선택 입력 필드. .txt 파일만 허용 -->
-        <input type="file" id="fileInput" name="file" accept=".txt">
-        <!-- 업로드 버튼 -->
-        <button type="submit">Upload</button>
-    </form>
-
-    <!-- 진행 상황을 표시할 div -->
-    <div id="progressContainer" style="display: none;">
-        <div id="progressBar" style="width: 0%; height: 20px; background-color: #4CAF50;"></div>
-        <div id="progressText"></div>
+    <div class="container">
+        <h1>파일 번역 서비스</h1>
+        <div class="file-input-container">
+            <input type="file" id="fileInput" name="file" accept=".txt, .srt" style="display: none;">
+            <span id="fileName" class="file-name">번역할 파일을 업로드해 주세요.</span>
+            <button id="uploadBtn" class="upload-btn">업로드</button>
+        </div>
+        <div id="progressContainer" style="display: none;">
+            <div id="progressBar"><span id="progressPercentage">0%</span></div>
+        </div>
+        <div id="statusMessage"></div>
+        <div id="translationStatus"></div>
+        <div id="downloadLinks"></div>
     </div>
-    <!-- 다운로드 링크를 표시할 div -->
-    <div id="download-link"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script>
-        // Socket.IO 연결 설정
-        const socket = io();
-        // HTML 요소 참조
-        const form = document.getElementById('uploadForm');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
-        const downloadLink = document.getElementById('download-link');
-        const fileInput = document.getElementById('fileInput');
-
-        // 폼 제출 이벤트 리스너
-        form.addEventListener('submit', (e) => {
-            e.preventDefault(); // 기본 제출 동작 방지
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            // 파일 업로드 요청
-            fetch('/upload', {
-                method: 'POST',
-                body: formData
-            }).then(response => {
-                if (response.ok) {
-                    progressContainer.style.display = 'block';
-                    progressText.textContent = 'File uploaded, waiting for translation...';
-                    progressBar.style.width = '10%';
-                } else {
-                    progressText.textContent = 'Failed to upload file. Please check the file extension.';
-                }
-            }).catch(error => {
-                console.error('Error:', error);
-                progressText.textContent = 'An error occurred while uploading the file.';
-            });
-        });
-
-        // 서버로부터의 진행 상황 업데이트 수신
-        socket.on('progress', (data) => {
-            // 진행 상황 메시지 업데이트
-            progressText.textContent = data.data;
-            progressBar.style.width = `${data.percentage}%`;
-            // 번역 완료 시 다운로드 링크 생성
-            if (data.filename) {
-                downloadLink.innerHTML = `<a href="/download/${data.filename}" download>Download Translated File</a>`;
-            }
-        });
-    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

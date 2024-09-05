@@ -1,8 +1,0 @@
-1
-00:00:00,090 --> 00:00:04,110
-- 다음은 Elon Musk, DJ Seo,
-
-2
-00:00:04,110 --> 00:00:07,950
-Matthew MacDougall, Bliss
-Chapman, Nolan Arbaugh와의 대화입니다.
