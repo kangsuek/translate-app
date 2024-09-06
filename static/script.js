@@ -18,14 +18,14 @@ fileInput.addEventListener('change', (e) => {
         fileName.textContent = e.target.files[0].name;
         uploadFile();
     } else {
-        fileName.textContent = '번역할 파일을 업로드해 주세요.';
+        fileName.textContent = 'Please upload a file to translate.';
     }
 });
 
 function uploadFile() {
     const file = fileInput.files[0];
     if (!file) {
-        statusMessage.textContent = '번역할 파일을 업로드해 주세요.';
+        statusMessage.textContent = 'Please upload a file to translate.';
         return;
     }
     
@@ -39,16 +39,16 @@ function uploadFile() {
     }).then(response => {
         if (response.ok) {
             progressContainer.style.display = 'block';
-            statusMessage.textContent = '파일 업로드 완료, 번역 대기 중...';
+            statusMessage.textContent = 'File upload completed, waiting for translation...';
             progressBar.style.width = '10%';
             progressPercentage.textContent = '10%';
-            translationStatus.textContent = '파일 처리 시작 중...';
+            translationStatus.textContent = 'Starting file processing...';
         } else {
-            statusMessage.textContent = '파일 업로드 실패. 파일 확장자를 확인해주세요.';
+            statusMessage.textContent = 'File upload failed. Please check the file extension.';
         }
     }).catch(error => {
         console.error('Error:', error);
-        statusMessage.textContent = '파일 업로드 중 오류가 발생했습니다.';
+        statusMessage.textContent = 'An error occurred while uploading the file.';
     });
 }
 
@@ -58,11 +58,11 @@ socket.on('progress', (data) => {
     progressPercentage.textContent = `${data.percentage}%`;
     
     if (data.percentage < 50) {
-        translationStatus.textContent = '파일 분할 및 번역 준비 중...';
+        translationStatus.textContent = 'Splitting file and preparing for translation...';
     } else if (data.percentage < 100) {
-        translationStatus.textContent = '파일 부분 번역 중...';
+        translationStatus.textContent = 'Translating file parts...';
     } else {
-        translationStatus.textContent = '번역 완료. 다운로드 링크 준비 중...';
+        translationStatus.textContent = 'Translation completed. Preparing download links...';
     }
 
     if (data.filenames) {
@@ -73,11 +73,11 @@ socket.on('progress', (data) => {
                 const link = document.createElement('a');
                 link.href = `/download/${filename}`;
                 link.download = newFilename;
-                link.textContent = `번역된 텍스트 다운로드 (.${originalExtension})`;
+                link.textContent = `Download translated text (.${originalExtension})`;
                 link.className = 'download-btn';
                 downloadLinks.appendChild(link);
             }
         });
-        translationStatus.textContent = '번역이 완료되었습니다. 다운로드 링크가 준비되었습니다.';
+        translationStatus.textContent = 'Translation is complete. Download links are ready.';
     }
 });
