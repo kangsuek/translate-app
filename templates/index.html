@@ -1,25 +1,37 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>파일 번역 서비스</title>
+    <title>File Translation Service</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>파일 번역 서비스</h1>
+        <h1>File Translation Service</h1>
         <div class="file-input-container">
-            <input type="file" id="fileInput" name="file" accept=".txt, .srt" style="display: none;">
-            <span id="fileName" class="file-name" title="번역할 파일을 업로드해 주세요.">번역할 파일을 업로드해 주세요.</span>
-            <button id="uploadBtn" class="upload-btn">업로드</button>
+            <input type="file" id="fileInput" name="files[]" accept=".txt, .srt" multiple style="display: none;">
+            <span id="fileName" class="file-name" title="Please upload files to translate.">Please upload files to translate.</span>
+            <button id="uploadBtn" class="upload-btn">Select Files</button>
         </div>
-        <div id="progressContainer" style="display: none;">
-            <div id="progressBar"><span id="progressPercentage">0%</span></div>
+        <div class="language-select-container">
+            <label for="targetLanguage">Select target language:</label>
+            <select id="targetLanguage" name="target_language">
+                {% for code, name in languages.items() %}
+                <option value="{{ code }}">{{ name }}</option>
+                {% endfor %}
+            </select>
         </div>
-        <div id="statusMessage"></div>
-        <div id="translationStatus"></div>
-        <div id="downloadLinks"></div>
+        <button id="startTranslationBtn" class="start-btn" disabled>Start Translation</button>
+        <div id="statusMessage" class="status-message"></div>
+        <div id="translationStatus" class="translation-status"></div>
+        <div id="progressContainer" class="progress-container" style="display: none;">
+            <div id="progressBar" class="progress-bar">
+                <span id="progressPercentage" class="progress-percentage">0%</span>
+            </div>
+        </div>
+        <div id="downloadLinks" class="download-links"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>

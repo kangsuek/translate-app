@@ -20,12 +20,23 @@ MAX_CHARS = 4000
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
+# Define the languages dictionary
+LANGUAGES = {
+    'ko': 'Korean',
+    'en': 'English',
+    'ja': 'Japanese',
+    'zh-cn': 'Chinese (Simplified)',
+    'fr': 'French',
+    'de': 'German',
+    'es': 'Spanish'
+}
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', languages=LANGUAGES)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -41,12 +52,25 @@ def upload_file():
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
-        
-        socketio.start_background_task(target=process_file, filepath=filepath, filename=filename)
-        
         return 'File uploaded successfully!', 200
     else:
         return 'File type not allowed', 400
+
+@app.route('/start_translation', methods=['POST'])
+def start_translation():
+    data = request.json
+    filename = data.get('filename')
+    target_language = data.get('target_language')
+    
+    if not filename or not target_language:
+        return 'Missing filename or target language', 400
+    
+    filepath = os.path.join(UPLOAD_FOLDER, secure_filename(filename))
+    if not os.path.exists(filepath):
+        return 'File not found', 404
+    
+    socketio.start_background_task(target=process_file, filepath=filepath, filename=filename, target_language=target_language)
+    return 'Translation started', 200
 
 def split_text(text, max_length):
     parts = []
@@ -65,7 +89,7 @@ def split_text(text, max_length):
     
     return parts
 
-def process_file(filepath, filename):
+def process_file(filepath, filename, target_language):
     with thread_lock:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -97,7 +121,7 @@ def process_file(filepath, filename):
             socketio.emit('progress', {'data': 'File splitting completed. Starting translation...', 'percentage': 50})
             eventlet.sleep(0)
 
-            translator = GoogleTranslator(source='auto', target='ko')
+            translator = GoogleTranslator(source='auto', target=target_language)
             all_translated_text = []
 
             for i, split_filename in enumerate(split_filenames, 1):
@@ -112,7 +136,7 @@ def process_file(filepath, filename):
                 socketio.emit('progress', {'data': f'Translated part {i} of {total_parts}', 'percentage': progress})
                 eventlet.sleep(0)
 
-            all_filename = f'{base_filename}_korean_all{original_extension}'
+            all_filename = f'{base_filename}_{target_language}_all{original_extension}'
             all_filepath = os.path.join(PROCESSED_FOLDER, all_filename)
 
             with open(all_filepath, 'w', encoding='utf-8') as f:

@@ -1,32 +1,35 @@
 body {
     font-family: 'Arial', sans-serif;
-    background-color: #f0f2f5;
+    background-color: #1a1a1a;
+    color: #e0e0e0;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
 }
 
 .container {
-    background-color: white;
+    background-color: #2a2a2a;
     padding: 2rem;
     border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     width: 100%;
     max-width: 500px;
 }
 
 h1 {
-    color: #333;
+    color: #ffffff;
     text-align: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
 }
 
 .file-input-container {
     display: flex;
-    margin-bottom: 1rem;
-    border: 1px solid #ccc;
+    margin-bottom: 1.5rem;
+    border: 1px solid #444;
     border-radius: 4px;
     overflow: hidden;
 }
@@ -37,29 +40,59 @@ h1 {
 
 .file-name {
     flex-grow: 1;
-    padding: 0.5rem;
+    padding: 0.75rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    background-color: #333;
+    color: #e0e0e0;
 }
 
-.upload-btn {
+.upload-btn, .start-btn {
     background-color: #4CAF50;
     color: white;
     border: none;
-    padding: 0.5rem 1rem;
+    padding: 0.75rem 1rem;
     cursor: pointer;
+    transition: background-color 0.3s;
 }
 
-#progressContainer {
+.upload-btn:hover, .start-btn:hover {
+    background-color: #45a049;
+}
+
+.language-select-container {
+    margin-bottom: 1.5rem;
+}
+
+#targetLanguage {
     width: 100%;
-    background-color: #e0e0e0;
+    padding: 0.75rem;
+    background-color: #333;
+    color: #e0e0e0;
+    border: 1px solid #444;
     border-radius: 4px;
-    margin-bottom: 1rem;
+}
+
+.start-btn {
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.start-btn:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+.progress-container {
+    width: 100%;
+    background-color: #444;
+    border-radius: 4px;
+    margin-bottom: 1.5rem;
     overflow: hidden;
 }
 
-#progressBar {
+.progress-bar {
     width: 0;
     height: 20px;
     background-color: #4CAF50;
@@ -69,14 +102,15 @@ h1 {
     transition: width 0.3s ease;
 }
 
-#statusMessage, #translationStatus {
+.status-message, .translation-status {
     text-align: center;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
 }
 
-#translationStatus {
+.translation-status {
     font-style: italic;
-    color: #666;
+    color: #aaa;
 }
 
 .download-btn {
@@ -88,7 +122,8 @@ h1 {
     text-align: center;
     text-decoration: none;
     border-radius: 4px;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
+    transition: background-color 0.3s;
 }
 
 .download-btn:hover {
