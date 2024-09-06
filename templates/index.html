@@ -10,11 +10,15 @@
 <body>
     <div class="container">
         <h1>File Translation Service</h1>
+        <!-- 파일 업로드 섹션 -->
         <div class="file-input-container">
             <input type="file" id="fileInput" name="files[]" accept=".txt, .srt" multiple style="display: none;">
             <span id="fileName" class="file-name" title="Please upload files to translate.">Please upload files to translate.</span>
             <button id="uploadBtn" class="upload-btn">Select Files</button>
         </div>
+        <!-- 업로드 진행 상황 표시 -->
+        <div id="uploadProgress" class="upload-progress" style="display: none;"></div>
+        <!-- 언어 선택 섹션 -->
         <div class="language-select-container">
             <label for="targetLanguage">Select target language:</label>
             <select id="targetLanguage" name="target_language">
@@ -23,17 +27,22 @@
                 {% endfor %}
             </select>
         </div>
+        <!-- 번역 시작 버튼 -->
         <button id="startTranslationBtn" class="start-btn" disabled>Start Translation</button>
+        <!-- 상태 메시지 표시 -->
         <div id="statusMessage" class="status-message"></div>
         <div id="translationStatus" class="translation-status"></div>
+        <!-- 진행 상황 표시 바 -->
         <div id="progressContainer" class="progress-container" style="display: none;">
             <div id="progressBar" class="progress-bar">
                 <span id="progressPercentage" class="progress-percentage">0%</span>
             </div>
         </div>
+        <!-- 다운로드 링크 표시 -->
         <div id="downloadLinks" class="download-links"></div>
     </div>
 
+    <!-- Socket.IO 및 자바스크립트 파일 로드 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

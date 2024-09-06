@@ -61,6 +61,14 @@ h1 {
     background-color: #45a049;
 }
 
+.upload-progress {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #4CAF50;
+}
+
 .language-select-container {
     margin-bottom: 1.5rem;
 }

@@ -1,4 +1,7 @@
+// Socket.IO 연결 설정
 const socket = io();
+
+// DOM 요소 선택
 const progressContainer = document.getElementById('progressContainer');
 const progressBar = document.getElementById('progressBar');
 const progressPercentage = document.getElementById('progressPercentage');
@@ -10,12 +13,16 @@ const fileName = document.getElementById('fileName');
 const uploadBtn = document.getElementById('uploadBtn');
 const startTranslationBtn = document.getElementById('startTranslationBtn');
 const targetLanguageSelect = document.getElementById('targetLanguage');
+const uploadProgress = document.getElementById('uploadProgress');
 
+// 파일 정보 저장 변수
 let originalExtension = '';
 let uploadedFilename = '';
 
+// 파일 선택 버튼 클릭 이벤트 처리
 uploadBtn.addEventListener('click', () => fileInput.click());
 
+// 파일 선택 시 이벤트 처리
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
         fileName.textContent = e.target.files[0].name;
@@ -25,6 +32,7 @@ fileInput.addEventListener('change', (e) => {
     }
 });
 
+// 파일 업로드 함수
 function uploadFile() {
     const file = fileInput.files[0];
     if (!file) {
@@ -37,22 +45,40 @@ function uploadFile() {
     originalExtension = file.name.split('.').pop();
     uploadedFilename = file.name;
 
-    fetch('/upload', {
-        method: 'POST',
-        body: formData
-    }).then(response => {
-        if (response.ok) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload', true);
+    
+    // 업로드 진행 상황 표시
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            uploadProgress.textContent = `${percentComplete}%`;
+            uploadProgress.style.display = 'block';
+        }
+    };
+
+    // 업로드 완료 처리
+    xhr.onload = function() {
+        if (xhr.status === 200) {
             statusMessage.textContent = 'File upload completed. Click "Start Translation" to begin.';
             startTranslationBtn.disabled = false;
         } else {
             statusMessage.textContent = 'File upload failed. Please check the file extension.';
         }
-    }).catch(error => {
-        console.error('Error:', error);
+        uploadProgress.style.display = 'none';
+    };
+
+    // 업로드 오류 처리
+    xhr.onerror = function() {
+        console.error('Error:', xhr.statusText);
         statusMessage.textContent = 'An error occurred while uploading the file.';
-    });
+        uploadProgress.style.display = 'none';
+    };
+
+    xhr.send(formData);
 }
 
+// 번역 시작 버튼 클릭 이벤트 처리
 startTranslationBtn.addEventListener('click', () => {
     if (!uploadedFilename) {
         statusMessage.textContent = 'Please upload a file first.';
@@ -61,6 +87,7 @@ startTranslationBtn.addEventListener('click', () => {
 
     const targetLanguage = targetLanguageSelect.value;
     
+    // 번역 시작 요청
     fetch('/start_translation', {
         method: 'POST',
         headers: {
@@ -86,11 +113,13 @@ startTranslationBtn.addEventListener('click', () => {
     });
 });
 
+// Socket.IO를 통한 진행 상황 업데이트 처리
 socket.on('progress', (data) => {
     statusMessage.textContent = data.data;
     progressBar.style.width = `${data.percentage}%`;
     progressPercentage.textContent = `${data.percentage}%`;
     
+    // 번역 단계별 상태 메시지 업데이트
     if (data.percentage < 50) {
         translationStatus.textContent = 'Splitting file and preparing for translation...';
     } else if (data.percentage < 100) {
@@ -99,6 +128,7 @@ socket.on('progress', (data) => {
         translationStatus.textContent = 'Translation completed. Preparing download link...';
     }
 
+    // 번역 완료 시 다운로드 링크 생성
     if (data.filenames) {
         setTimeout(() => {
             downloadLinks.innerHTML = '';
@@ -111,6 +141,6 @@ socket.on('progress', (data) => {
                 downloadLinks.appendChild(link);
             });
             translationStatus.textContent = 'Translation is complete. Download link is ready.';
-        }, 1000); // 1 second delay
+        }, 1000); // 1초 지연
     }
 });
