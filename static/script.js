@@ -1,146 +1,148 @@
-// Socket.IO 연결 설정
 const socket = io();
 
-// DOM 요소 선택
-const progressContainer = document.getElementById('progressContainer');
-const progressBar = document.getElementById('progressBar');
-const progressPercentage = document.getElementById('progressPercentage');
-const statusMessage = document.getElementById('statusMessage');
-const translationStatus = document.getElementById('translationStatus');
-const downloadLinks = document.getElementById('downloadLinks');
 const fileInput = document.getElementById('fileInput');
 const fileName = document.getElementById('fileName');
 const uploadBtn = document.getElementById('uploadBtn');
 const startTranslationBtn = document.getElementById('startTranslationBtn');
 const targetLanguageSelect = document.getElementById('targetLanguage');
 const uploadProgress = document.getElementById('uploadProgress');
+const fileList = document.getElementById('fileList');
+const statusMessage = document.getElementById('statusMessage');
 
-// 파일 정보 저장 변수
-let originalExtension = '';
-let uploadedFilename = '';
+let uploadedFiles = [];
 
-// 파일 선택 버튼 클릭 이벤트 처리
 uploadBtn.addEventListener('click', () => fileInput.click());
 
-// 파일 선택 시 이벤트 처리
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
-        fileName.textContent = e.target.files[0].name;
-        uploadFile();
-    } else {
-        fileName.textContent = 'Please upload a file to translate.';
+        uploadFiles(e.target.files);
     }
 });
 
-// 파일 업로드 함수
-function uploadFile() {
-    const file = fileInput.files[0];
-    if (!file) {
-        statusMessage.textContent = 'Please upload a file to translate.';
-        return;
-    }
-    
+function uploadFiles(files) {
     const formData = new FormData();
-    formData.append('file', file);
-    originalExtension = file.name.split('.').pop();
-    uploadedFilename = file.name;
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
+    }
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload', true);
-    
-    // 업로드 진행 상황 표시
-    xhr.upload.onprogress = function(e) {
-        if (e.lengthComputable) {
-            const percentComplete = Math.round((e.loaded / e.total) * 100);
-            uploadProgress.textContent = `${percentComplete}%`;
-            uploadProgress.style.display = 'block';
-        }
-    };
-
-    // 업로드 완료 처리
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            statusMessage.textContent = 'File upload completed. Click "Start Translation" to begin.';
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.files) {
+            uploadedFiles = data.files;
+            updateFileList();
             startTranslationBtn.disabled = false;
         } else {
-            statusMessage.textContent = 'File upload failed. Please check the file extension.';
+            statusMessage.textContent = data.error || 'Upload failed';
         }
-        uploadProgress.style.display = 'none';
-    };
-
-    // 업로드 오류 처리
-    xhr.onerror = function() {
-        console.error('Error:', xhr.statusText);
-        statusMessage.textContent = 'An error occurred while uploading the file.';
-        uploadProgress.style.display = 'none';
-    };
-
-    xhr.send(formData);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusMessage.textContent = 'An error occurred while uploading the files.';
+    });
 }
 
-// 번역 시작 버튼 클릭 이벤트 처리
+function updateFileList() {
+    fileList.innerHTML = '';
+    uploadedFiles.forEach(file => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <span>${file.name}</span>
+            <div class="file-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
+                </div>
+                <span class="progress-text">0%</span>
+            </div>
+            <button class="delete-btn" data-file-id="${file.id}">삭제</button>
+        `;
+        fileList.appendChild(fileItem);
+    });
+
+    // 삭제 버튼에 이벤트 리스너 추가
+    const deleteButtons = document.querySelectorAll('.delete-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const fileId = e.target.getAttribute('data-file-id');
+            deleteFile(fileId);
+        });
+    });
+}
+
+function deleteFile(fileId) {
+    fetch(`/delete_file/${fileId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            uploadedFiles = uploadedFiles.filter(file => file.id !== fileId);
+            updateFileList();
+            if (uploadedFiles.length === 0) {
+                startTranslationBtn.disabled = true;
+            }
+            statusMessage.textContent = '파일이 성공적으로 삭제되었습니다.';
+        } else {
+            statusMessage.textContent = data.error || '파일 삭제에 실패했습니다.';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        statusMessage.textContent = '파일 삭제 중 오류가 발생했습니다.';
+    });
+}
+
 startTranslationBtn.addEventListener('click', () => {
-    if (!uploadedFilename) {
-        statusMessage.textContent = 'Please upload a file first.';
+    if (uploadedFiles.length === 0) {
+        statusMessage.textContent = 'Please upload files first.';
         return;
     }
 
     const targetLanguage = targetLanguageSelect.value;
     
-    // 번역 시작 요청
     fetch('/start_translation', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            filename: uploadedFilename,
+            files: uploadedFiles,
             target_language: targetLanguage
         })
-    }).then(response => {
-        if (response.ok) {
-            progressContainer.style.display = 'block';
-            statusMessage.textContent = 'Translation started...';
-            progressBar.style.width = '0%';
-            progressPercentage.textContent = '0%';
-            translationStatus.textContent = 'Starting file processing...';
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            statusMessage.textContent = data.message;
         } else {
-            statusMessage.textContent = 'Failed to start translation. Please try again.';
+            statusMessage.textContent = data.error || 'Failed to start translation';
         }
-    }).catch(error => {
+    })
+    .catch(error => {
         console.error('Error:', error);
         statusMessage.textContent = 'An error occurred while starting the translation.';
     });
 });
 
-// Socket.IO를 통한 진행 상황 업데이트 처리
-socket.on('progress', (data) => {
-    statusMessage.textContent = data.data;
-    progressBar.style.width = `${data.percentage}%`;
-    progressPercentage.textContent = `${data.percentage}%`;
-    
-    // 번역 단계별 상태 메시지 업데이트
-    if (data.percentage < 50) {
-        translationStatus.textContent = 'Splitting file and preparing for translation...';
-    } else if (data.percentage < 100) {
-        translationStatus.textContent = 'Translating file parts...';
-    } else {
-        translationStatus.textContent = 'Translation completed. Preparing download link...';
-    }
+socket.on('file_progress', (data) => {
+    const fileItem = fileList.querySelector(`.file-item:nth-child(${uploadedFiles.findIndex(f => f.id === data.file_id) + 1})`);
+    if (fileItem) {
+        const progressBar = fileItem.querySelector('.progress-fill');
+        const progressText = fileItem.querySelector('.progress-text');
+        progressBar.style.width = `${data.percentage}%`;
+        progressText.textContent = `${data.percentage}% - ${data.status}`;
 
-    // 번역 완료 시 다운로드 링크 생성
-    if (data.filenames) {
-        setTimeout(() => {
-            downloadLinks.innerHTML = '';
-            data.filenames.forEach((filename) => {
-                const link = document.createElement('a');
-                link.href = `/download/${filename}`;
-                link.download = filename;
-                link.textContent = `Download translated file (${filename})`;
-                link.className = 'download-btn';
-                downloadLinks.appendChild(link);
-            });
-            translationStatus.textContent = 'Translation is complete. Download link is ready.';
-        }, 1000); // 1초 지연
+        if (data.download_filename) {
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `/download/${data.download_filename}`;
+            downloadLink.download = data.download_filename;
+            downloadLink.textContent = 'Download';
+            downloadLink.className = 'download-btn';
+            fileItem.appendChild(downloadLink);
+        }
     }
 });
