@@ -1,14 +1,12 @@
 import eventlet
-eventlet.monkey_patch()
-
+import os
+import re
+import uuid
+import logging
+from threading import Lock
 from flask import Flask, render_template, request, send_file, jsonify
 from flask_socketio import SocketIO
 from deep_translator import GoogleTranslator
-import os
-from threading import Lock
-import uuid
-import logging
-import re
 
 app = Flask(__name__)
 # logging.basicConfig(filename='logs/app.log', level=logging.DEBUG)
@@ -125,6 +123,7 @@ def process_files(files, target_language):
         filepath = os.path.join(UPLOAD_FOLDER, f"{file_id}_{filename}")
         process_file(filepath, filename, target_language, file_id)
 
+
 def process_file(filepath, filename, target_language, file_id):
     with thread_lock:
         try:
@@ -196,7 +195,11 @@ def process_file(filepath, filename, target_language, file_id):
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    return send_file(os.path.join(PROCESSED_FOLDER, filename), as_attachment=True)
+    file_path = os.path.join(PROCESSED_FOLDER, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    else:
+        return jsonify({'error': 'File not found'}), 404
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
