@@ -21,10 +21,24 @@ fileInput.addEventListener('change', (e) => {
 
 function uploadFiles(files) {
     const formData = new FormData();
+    let duplicateFiles = [];
+
+    // 파일명 중복 검사
     for (let i = 0; i < files.length; i++) {
-        formData.append('files[]', files[i]);
+        if (uploadedFiles.some(uploadedFile => uploadedFile.name === files[i].name)) {
+            duplicateFiles.push(files[i].name);
+        } else {
+            formData.append('files[]', files[i]);
+        }
     }
 
+    // 중복 파일이 있으면 사용자에게 알리고 업로드 중단
+    if (duplicateFiles.length > 0) {
+        statusMessage.textContent = `The following files are already uploaded: \n ${duplicateFiles.join(', ')}`;
+        return;
+    }
+
+    // 중복 파일이 없으면 업로드 진행
     fetch('/upload', {
         method: 'POST',
         body: formData
@@ -36,8 +50,9 @@ function uploadFiles(files) {
             updateFileList();
             startTranslationBtn.disabled = false;
             fileInput.value = ''; // Clear the file input
+            statusMessage.textContent = 'The file was successfully uploaded.';
         } else {
-            statusMessage.textContent = data.error || 'Upload failed';
+            statusMessage.textContent = data.error || 'Upload failed.';
         }
     })
     .catch(error => {
