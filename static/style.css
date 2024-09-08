@@ -48,7 +48,7 @@ h1 {
     color: #e0e0e0;
 }
 
-.upload-btn, .start-btn {
+.upload-btn, .start-btn, .delete-btn {
     background-color: #4CAF50;
     color: white;
     border: none;
@@ -57,8 +57,19 @@ h1 {
     transition: background-color 0.3s;
 }
 
-.upload-btn:hover, .start-btn:hover {
+.upload-btn:hover, .start-btn:hover, .delete-btn:hover {
     background-color: #45a049;
+}
+
+.delete-btn {
+    background-color: #f44336;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+.delete-btn:hover {
+    background-color: #d32f2f;
 }
 
 .upload-progress {
@@ -78,6 +89,9 @@ h1 {
     border-radius: 4px;
     padding: 0.75rem;
     margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .file-item .progress-bar {
@@ -86,6 +100,8 @@ h1 {
     border-radius: 5px;
     overflow: hidden;
     margin-top: 0.5rem;
+    flex-grow: 1;
+    margin-right: 0.5rem;
 }
 
 .file-item .progress-fill {
@@ -128,30 +144,6 @@ h1 {
     text-align: center;
     margin-bottom: 1.5rem;
     line-height: 1.5;
-}
-
-.overall-progress {
-    margin-top: 1.5rem;
-}
-
-.overall-progress .progress-bar {
-    height: 20px;
-    background-color: #444;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.overall-progress .progress-fill {
-    height: 100%;
-    background-color: #4CAF50;
-    width: 0;
-    transition: width 0.3s ease;
-}
-
-.overall-progress .progress-text {
-    text-align: center;
-    margin-top: 0.5rem;
-    display: block;
 }
 
 .download-btn {

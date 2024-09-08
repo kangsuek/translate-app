@@ -32,9 +32,10 @@ function uploadFiles(files) {
     .then(response => response.json())
     .then(data => {
         if (data.files) {
-            uploadedFiles = data.files;
+            uploadedFiles = [...uploadedFiles, ...data.files];
             updateFileList();
             startTranslationBtn.disabled = false;
+            fileInput.value = ''; // Clear the file input
         } else {
             statusMessage.textContent = data.error || 'Upload failed';
         }
@@ -58,12 +59,12 @@ function updateFileList() {
                 </div>
                 <span class="progress-text">0%</span>
             </div>
-            <button class="delete-btn" data-file-id="${file.id}">삭제</button>
+            <button class="delete-btn" data-file-id="${file.id}">Delete</button>
         `;
         fileList.appendChild(fileItem);
     });
 
-    // 삭제 버튼에 이벤트 리스너 추가
+    // Add event listeners to delete buttons
     const deleteButtons = document.querySelectorAll('.delete-btn');
     deleteButtons.forEach(button => {
         button.addEventListener('click', (e) => {
@@ -71,6 +72,13 @@ function updateFileList() {
             deleteFile(fileId);
         });
     });
+
+    // Update the file name display
+    if (uploadedFiles.length > 0) {
+        fileName.textContent = `${uploadedFiles.length} file(s) selected`;
+    } else {
+        fileName.textContent = 'Please upload files to translate.';
+    }
 }
 
 function deleteFile(fileId) {
@@ -85,14 +93,14 @@ function deleteFile(fileId) {
             if (uploadedFiles.length === 0) {
                 startTranslationBtn.disabled = true;
             }
-            statusMessage.textContent = '파일이 성공적으로 삭제되었습니다.';
+            statusMessage.textContent = 'File successfully deleted.';
         } else {
-            statusMessage.textContent = data.error || '파일 삭제에 실패했습니다.';
+            statusMessage.textContent = data.error || 'Failed to delete file.';
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        statusMessage.textContent = '파일 삭제 중 오류가 발생했습니다.';
+        statusMessage.textContent = 'An error occurred while deleting the file.';
     });
 }
 
@@ -129,7 +137,7 @@ startTranslationBtn.addEventListener('click', () => {
 });
 
 socket.on('file_progress', (data) => {
-    const fileItem = fileList.querySelector(`.file-item:nth-child(${uploadedFiles.findIndex(f => f.id === data.file_id) + 1})`);
+    const fileItem = Array.from(fileList.children).find(item => item.querySelector('.delete-btn').dataset.fileId === data.file_id);
     if (fileItem) {
         const progressBar = fileItem.querySelector('.progress-fill');
         const progressText = fileItem.querySelector('.progress-text');
