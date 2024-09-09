@@ -45,6 +45,14 @@ function uploadFiles(files) {
         return;
     }
 
+    // Show progress for each file uploaded
+    newFiles.forEach(fileName => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `<span>${fileName}</span><div class='file-progress'><div class='progress-bar'><div class='progress-fill' style='width: 0%'></div></div><span class='progress-text'>0%</span></div><button class='delete-btn' data-file-name='${fileName}'>Delete</button>`;
+        fileList.appendChild(fileItem);
+    });
+
     // Upload new files
     fetch('/upload', {
         method: 'POST',
@@ -73,16 +81,7 @@ function updateFileList() {
     uploadedFiles.forEach(file => {
         const fileItem = document.createElement('div');
         fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            <span>${file.name}</span>
-            <div class="file-progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 0%"></div>
-                </div>
-                <span class="progress-text">0%</span>
-            </div>
-            <button class="delete-btn" data-file-id="${file.id}">Delete</button>
-        `;
+        fileItem.innerHTML = `<span>${file.name}</span><button class='delete-btn' data-file-id='${file.id}'>Delete</button>`;
         fileList.appendChild(fileItem);
     });
 
@@ -159,7 +158,7 @@ startTranslationBtn.addEventListener('click', () => {
 });
 
 socket.on('file_progress', (data) => {
-    const fileItem = Array.from(fileList.children).find(item => item.querySelector('.delete-btn').dataset.fileId === data.file_id);
+    const fileItem = Array.from(fileList.children).find(item => item.querySelector('.delete-btn').dataset.fileName === data.file_name);
     if (fileItem) {
         const progressBar = fileItem.querySelector('.progress-fill');
         const progressText = fileItem.querySelector('.progress-text');

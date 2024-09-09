@@ -9,7 +9,12 @@ from flask_socketio import SocketIO
 from deep_translator import GoogleTranslator
 
 app = Flask(__name__)
+# app.run(debug=False)
 # logging.basicConfig(filename='logs/app.log', level=logging.DEBUG)
+
+app.config['SESSION_COOKIE_SECURE'] = False  # 개발 환경에서만 사용
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+
 socketio = SocketIO(app, async_mode='eventlet')
 thread_lock = Lock()
 
