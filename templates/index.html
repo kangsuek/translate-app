@@ -1,35 +1,59 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Translation Service</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-    <div class="container">
-        <h1>File Translation Service</h1>
-        <div class="file-input-container">
-            <input type="file" id="fileInput" name="files[]" accept=".txt, .srt" multiple style="display: none;">
-            <span id="fileName" class="file-name" title="Please upload files to translate.">Please upload files to translate.</span>
-            <button id="uploadBtn" class="upload-btn">Select Files</button>
-        </div>
-        <div id="uploadProgress" class="upload-progress" style="display: none;"></div>
-        <div class="language-select-container">
-            <label for="targetLanguage">Select target language:</label>
-            <select id="targetLanguage" name="target_language">
-                {% for code, name in languages.items() %}
-                <option value="{{ code }}">{{ name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div id="fileList" class="file-list"></div>
-        <button id="startTranslationBtn" class="start-btn" disabled>Start Translation</button>
-        <div id="statusMessage" class="status-message"></div>
-    </div>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>File Translation Service</title>
+        <link
+            rel="icon"
+            type="image/x-icon"
+            href="{{ url_for('static', filename='favicon.ico') }}"
+        />
+        <link
+            rel="stylesheet"
+            href="{{ url_for('static', filename='style.css') }}"
+        />
+        <meta name="referrer" content="no-referrer" />
+    </head>
+    <body>
+        <div class="container">
+            <h1>File Translation Service</h1>
+            <div class="file-input-container">
+                <input type="file" id="fileInput" name="files[]" multiple />
+                <label
+                    for="fileInput"
+                    class="file-name"
+                    title="Please upload files to translate."
+                ></label>
+                <button id="uploadBtn" class="upload-btn">Select Files</button>
+            </div>
+            <!-- Element to display file selection status -->
+            <span id="fileName"></span>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
+            <div
+                id="uploadProgress"
+                class="upload-progress"
+                style="display: none"
+            ></div>
+            <div class="language-select-container">
+                <label for="targetLanguage">Select Target Language:</label>
+                <select id="targetLanguage" name="target_language">
+                    {% for code, name in languages.items() %}
+                    <option value="{{ code }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div id="fileList" class="file-list"></div>
+            <button id="startTranslationBtn" class="start-btn" disabled>
+                Start Translation
+            </button>
+            <div id="statusMessage" class="status-message"></div>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+        <script src="{{ url_for('static', filename='script.js') }}"></script>
+        <script>
+            var allowedExtensions = "{{ allowed_extensions | safe }}";
+        </script>
+    </body>
 </html>
