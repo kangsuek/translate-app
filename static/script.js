@@ -184,7 +184,7 @@ socket.on("file_progress", (data) => {
       if (!downloadLink) {
         downloadLink = document.createElement("a");
         downloadLink.href = `/download/${encodeURIComponent(data.download_filename)}`;
-        downloadLink.download = data.download_filename;
+        downloadLink.download = data.download_filename.split('_').slice(0, -1).join('_') + '_' + data.download_filename.split('_').pop();
         downloadLink.textContent = "Download";
         downloadLink.className = "download-btn";
         downloadLink.addEventListener("click", (e) => {
@@ -194,7 +194,7 @@ socket.on("file_progress", (data) => {
         fileItem.querySelector(".file-actions").appendChild(downloadLink);
       } else {
         downloadLink.href = `/download/${encodeURIComponent(data.download_filename)}`;
-        downloadLink.download = data.download_filename;
+        downloadLink.download = data.download_filename.split('_').slice(0, -1).join('_') + '_' + data.download_filename.split('_').pop();
       }
     }
   }
@@ -205,4 +205,12 @@ document.addEventListener("DOMContentLoaded", function () {
   if (fileInput && typeof allowedExtensions !== "undefined") {
     fileInput.accept = allowedExtensions;
   }
+});
+
+// 언어 선택 옵션을 동적으로 생성
+Object.entries(LANGUAGES).forEach(([code, name]) => {
+  const option = document.createElement('option');
+  option.value = code;
+  option.textContent = name;
+  targetLanguageSelect.appendChild(option);
 });

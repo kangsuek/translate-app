@@ -38,9 +38,7 @@
             <div class="language-select-container">
                 <label for="targetLanguage">Select Target Language:</label>
                 <select id="targetLanguage" name="target_language">
-                    {% for code, name in languages.items() %}
-                    <option value="{{ code }}">{{ name }}</option>
-                    {% endfor %}
+                    <!-- 옵션들은 JavaScript에서 동적으로 생성됩니다 -->
                 </select>
             </div>
             <div id="fileList" class="file-list"></div>

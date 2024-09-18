@@ -36,7 +36,8 @@ LANGUAGES = {
     'ko': 'Korean',
     'en': 'English',
     'ja': 'Japanese',
-    'zh-cn': 'Chinese (Simplified)',
+    'zh-CN': '中文(简体)',
+    'zh-TW': '中文(繁體)',
     'fr': 'French',
     'de': 'German',
     'es': 'Spanish'
@@ -123,7 +124,7 @@ def delete_file(file_id):
 @app.route('/start_translation', methods=['POST'])
 def start_translation():
     data = request.json
-    files = data.get('files')
+    files = data.get('files', [])
     target_language = data.get('target_language')
 
     if not files or not target_language:
@@ -131,7 +132,7 @@ def start_translation():
 
     # Check if the language is supported
     if target_language not in LANGUAGES:
-        return jsonify({'error': 'Unsupported target language.'}), 400
+        return jsonify({'error': f'Unsupported language. Please choose one of the supported languages: {", ".join(LANGUAGES.keys())}'}), 400
 
     for file in files:
         file_id = file['id']
@@ -245,22 +246,28 @@ def download_file(filename):
         secure_name = secure_filename(filename)
         file_path = os.path.join(PROCESSED_FOLDER, secure_name)
 
-        logging.info(f"Requested file path: {file_path}")
 
-        # Additional check to prevent path manipulation
         if not os.path.abspath(file_path).startswith(os.path.abspath(PROCESSED_FOLDER)) or '..' in filename:
-            logging.warning(f"Attempted invalid file path access: {file_path}")
             abort(404)
 
         if os.path.exists(file_path) and os.path.isfile(file_path):
             logging.info(f"Starting file download: {file_path}")
-            return send_file(file_path, as_attachment=True, download_name=secure_name)
+            
+            # Remove file_id from filename
+            base_filename, ext = os.path.splitext(secure_name)
+            parts = base_filename.rsplit('_', 2)
+            if len(parts) >= 3:
+                download_name = f"{parts[0]}_{parts[2]}{ext}"
+            else:
+                download_name = secure_name
+            
+            return send_file(file_path, as_attachment=True, download_name=download_name)
         else:
             logging.error(f"File not found: {file_path}")
             return jsonify({'error': 'File not found.'}), 404
     except Exception as e:
-        logging.error(f"Download error: {e}")
-        return jsonify({'error': 'An error occurred while downloading the file.'}), 500
+        logging.error(f"Error during file download: {e}")
+        return jsonify({'error': 'An error occurred during file download.'}), 500
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
