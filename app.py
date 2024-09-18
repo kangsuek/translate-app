@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 from deep_translator import GoogleTranslator
 from flask_socketio import SocketIO
 from config import Config
+import csv
+import io
 
 # Flask 애플리케이션 초기화 및 설정
 app = Flask(__name__)
@@ -121,7 +123,6 @@ def delete_file(file_id):
             logging.info(f"Deleted files: {', '.join(deleted_files)}")
             return jsonify({'success': True, 'message': f'Files successfully deleted: {", ".join(deleted_files)}'}), 200
         else:
-            # 파일을 찾지 못한 경우 디버깅을 위해 모든 파일 로깅
             for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
                 logging.info(f"Files in {folder}: {', '.join(os.listdir(folder))}")
             return jsonify({'success': False, 'error': 'File not found.'}), 404
@@ -176,62 +177,44 @@ def split_text(text, max_length):
 
     return parts
 
-def process_file(filepath, filename, target_language, file_id):
-    # 파일 처리 및 번역
-    split_filenames = []
+def process_csv_file(filepath, filename, target_language, file_id):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            text = f.read()
-
-        text_parts = split_text(text, MAX_CHARS)
-        total_parts = len(text_parts)
-
-        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 10, 'status': 'Splitting file...'})
-        eventlet.sleep(0)
-
-        base_filename = os.path.splitext(filename)[0]
-        original_extension = os.path.splitext(filename)[1]
-        split_filenames = []
-
-        for i, part in enumerate(text_parts, 1):
-            split_filename = f'{base_filename}_part{i}.txt'
-            split_filepath = os.path.join(PROCESSED_FOLDER, split_filename)
-
-            with open(split_filepath, 'w', encoding='utf-8') as f:
-                f.write(part)
-
-            split_filenames.append(split_filename)
-
-            progress = int((i / total_parts) * 30) + 10  # 10% ~ 40%
-            socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Saving part {i}/{total_parts}...'})
-            eventlet.sleep(0)
-
-        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 40, 'status': 'Starting translation...'})
-        eventlet.sleep(0)
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            rows = list(csv_reader)
 
         translator = GoogleTranslator(source='auto', target=target_language)
-        all_translated_text = []
 
-        for i, split_filename in enumerate(split_filenames, 1):
-            split_filepath = os.path.join(PROCESSED_FOLDER, split_filename)
-            with open(split_filepath, 'r', encoding='utf-8') as f:
-                part_text = f.read()
+        # 헤더 번역
+        translated_headers = [translator.translate(header) for header in headers]
 
-            translated_text = translator.translate(part_text)
-            all_translated_text.append(translated_text)
+        # 진행 상황 업데이트
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 10, 'status': 'Translating headers...'})
+        eventlet.sleep(0)
 
-            progress = int((i / total_parts) * 50) + 40  # 40% ~ 90%
-            socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Translating part {i}/{total_parts}...'})
+        # 데이터 번역
+        translated_rows = []
+        total_rows = len(rows)
+        for i, row in enumerate(rows):
+            translated_row = [translator.translate(cell) for cell in row]
+            translated_rows.append(translated_row)
+
+            progress = int((i / total_rows) * 80) + 10
+            socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Translating row {i+1}/{total_rows}...'})
             eventlet.sleep(0)
 
-        # 파일 이름에 file_id 포함
-        translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}{original_extension}')
+        # 번역된 CSV 파일 저장
+        base_filename = os.path.splitext(filename)[0]
+        translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}.csv')
         translated_filepath = os.path.join(PROCESSED_FOLDER, translated_filename)
 
-        with open(translated_filepath, 'w', encoding='utf-8') as f:
-            f.write("\n\n".join(all_translated_text))
+        with open(translated_filepath, 'w', encoding='utf-8', newline='') as f:
+            csv_writer = csv.writer(f)
+            csv_writer.writerow(translated_headers)
+            csv_writer.writerows(translated_rows)
 
-        logging.info(f"Translated file saved: {translated_filepath}")
+        logging.info(f"Translated CSV file saved: {translated_filepath}")
 
         socketio.emit('file_progress', {
             'file_id': file_id,
@@ -241,15 +224,87 @@ def process_file(filepath, filename, target_language, file_id):
         })
 
     except Exception as e:
+        logging.error(f"CSV file processing error ({filename}): {e}")
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'Error occurred: {str(e)}'})
+
+def process_file(filepath, filename, target_language, file_id):
+    # 파일 처리 및 번역
+    try:
+        if filename.lower().endswith('.csv'):
+            process_csv_file(filepath, filename, target_language, file_id)
+        else:
+            # 기존의 텍스트 파일 처리 로직
+            with open(filepath, 'r', encoding='utf-8') as f:
+                text = f.read()
+
+            text_parts = split_text(text, MAX_CHARS)
+            total_parts = len(text_parts)
+
+            socketio.emit('file_progress', {'file_id': file_id, 'percentage': 10, 'status': 'Splitting file...'})
+            eventlet.sleep(0)
+
+            base_filename = os.path.splitext(filename)[0]
+            original_extension = os.path.splitext(filename)[1]
+            split_filenames = []
+
+            for i, part in enumerate(text_parts, 1):
+                split_filename = f'{base_filename}_part{i}.txt'
+                split_filepath = os.path.join(PROCESSED_FOLDER, split_filename)
+
+                with open(split_filepath, 'w', encoding='utf-8') as f:
+                    f.write(part)
+
+                split_filenames.append(split_filename)
+
+                progress = int((i / total_parts) * 30) + 10  # 10% ~ 40%
+                socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Saving part {i}/{total_parts}...'})
+                eventlet.sleep(0)
+
+            socketio.emit('file_progress', {'file_id': file_id, 'percentage': 40, 'status': 'Starting translation...'})
+            eventlet.sleep(0)
+
+            translator = GoogleTranslator(source='auto', target=target_language)
+            all_translated_text = []
+
+            for i, split_filename in enumerate(split_filenames, 1):
+                split_filepath = os.path.join(PROCESSED_FOLDER, split_filename)
+                with open(split_filepath, 'r', encoding='utf-8') as f:
+                    part_text = f.read()
+
+                translated_text = translator.translate(part_text)
+                all_translated_text.append(translated_text)
+
+                progress = int((i / total_parts) * 50) + 40  # 40% ~ 90%
+                socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Translating part {i}/{total_parts}...'})
+                eventlet.sleep(0)
+
+            # 파일 이름에 file_id 포함
+            translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}{original_extension}')
+            translated_filepath = os.path.join(PROCESSED_FOLDER, translated_filename)
+
+            with open(translated_filepath, 'w', encoding='utf-8') as f:
+                f.write("\n\n".join(all_translated_text))
+
+            logging.info(f"Translated file saved: {translated_filepath}")
+
+            socketio.emit('file_progress', {
+                'file_id': file_id,
+                'percentage': 100,
+                'status': 'Translation complete!',
+                'download_filename': translated_filename
+            })
+
+    except Exception as e:
         logging.error(f"File processing error ({filename}): {e}")
         socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'Error occurred: {str(e)}'})
     finally:
-        # 분할된 파일 삭제
-        for split_filename in split_filenames:
-            try:
-                os.remove(os.path.join(PROCESSED_FOLDER, split_filename))
-            except Exception as e:
-                logging.error(f"Error deleting split file ({split_filename}): {e}")
+        # 분할된 파일 삭제 (CSV 파일 처리 시에는 해당 없음)
+        if not filename.lower().endswith('.csv'):
+            for split_filename in split_filenames:
+                try:
+                    os.remove(os.path.join(PROCESSED_FOLDER, split_filename))
+                except Exception as e:
+                    logging.error(f"Error deleting split file ({split_filename}): {e}")
 
 @app.route('/download/<filename>')
 def download_file(filename):
