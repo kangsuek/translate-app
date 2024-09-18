@@ -19,7 +19,7 @@
         <div class="container">
             <h1>File Translation Service</h1>
             <div class="file-input-container">
-                <input type="file" id="fileInput" name="files[]" multiple />
+                <input type="file" id="fileInput" name="files[]" multiple accept="{{ allowed_extensions }}">
                 <label
                     for="fileInput"
                     class="file-name"

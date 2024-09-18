@@ -13,10 +13,25 @@ let uploadedFiles = [];
 uploadBtn.addEventListener("click", () => fileInput.click());
 
 fileInput.addEventListener("change", (e) => {
-  if (e.target.files.length > 0) {
-    uploadFiles(e.target.files);
+  const files = Array.from(e.target.files);
+  const invalidFiles = files.filter(file => {
+    const extension = '.' + file.name.split('.').pop().toLowerCase();
+    return !allowedExtensions.includes(extension);
+  });
+
+  if (invalidFiles.length > 0) {
+    alert('The following files are not allowed: ' + invalidFiles.map(f => f.name).join(', '));
+    e.target.value = '';  // 파일 선택 초기화
+  } else {
+    handleFileUpload(e);
   }
 });
+
+function handleFileUpload(event) {
+  if (event.target.files.length > 0) {
+    uploadFiles(event.target.files);
+  }
+}
 
 function uploadFiles(files) {
   const formData = new FormData();

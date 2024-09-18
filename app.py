@@ -12,26 +12,30 @@ from deep_translator import GoogleTranslator
 from flask_socketio import SocketIO
 from config import Config
 
+# Flask 애플리케이션 초기화 및 설정
 app = Flask(__name__)
 app.config.from_object(Config)
 logging.basicConfig(filename='logs/app.log', level=logging.DEBUG,
                     format='%(asctime)s %(levelname)s: %(message)s')
 
-app.config['SESSION_COOKIE_SECURE'] = False  # Use only in development environment
+app.config['SESSION_COOKIE_SECURE'] = False # 개발 환경에서만 사용하는 세션 쿠키 설정
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
+# SocketIO 초기화
 socketio = SocketIO(app, async_mode='eventlet')
 thread_lock = Lock()
 
+# 설정 값 불러오기
 UPLOAD_FOLDER = app.config['UPLOAD_FOLDER']
 PROCESSED_FOLDER = app.config['PROCESSED_FOLDER']
 ALLOWED_EXTENSIONS = app.config['ALLOWED_EXTENSIONS']
 MAX_CHARS = app.config['MAX_CHARS']
 
-# Create folders if they don't exist
+# 필요한 폴더 생성
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
+# 지원하는 언어 목록
 LANGUAGES = {
     'ko': 'Korean',
     'en': 'English',
@@ -44,41 +48,44 @@ LANGUAGES = {
 }
 
 def sanitize_filename(filename):
-    # Separate file extension
+    # 파일 이름에서 확장자 분리
     name, ext = os.path.splitext(filename)
 
-    # Unicode normalization (e.g., handling accent characters)
+    # 유니코드 정규화 (예: 악센트 문자 처리)
     name = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('ASCII')
 
-    # Replace spaces with underscores
+    # 공백을 언더스코어로 대체
     name = re.sub(r'\s+', '_', name)
 
-    # Remove disallowed characters (including those problematic for Windows, macOS, Linux)
+    # 허용되지 않는 문자 제거 (Windows, macOS, Linux에서 문제가 될 수 있는 문자 포함)
     name = re.sub(r'[\\/*?:"<>|\'`~!@#$%^&()+={}[\],;]', "", name)
 
-    # Remove consecutive underscores
+    # 연속된 언더스코어 제거
     name = re.sub(r'_+', '_', name)
 
-    # Remove leading and trailing underscores
+    # 앞뒤 언더스코어 제거
     name = name.strip('_')
 
-    # Set default name if empty or all characters were removed
+    # 이름이 비어있거나 모든 문자가 제거된 경우 기본 이름 설정
     if not name:
         name = "unnamed_file"
 
-    # Recombine filename and extension
+    # 파일 이름과 확장자 재결합
     return name + ext
 
 def allowed_file(filename):
+    # 허용된 파일 확장자인지 확인
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 @app.route('/')
 def index():
+    # 허용된 파일 확장자 목록 생성
     allowed_extensions = ','.join(['.' + ext for ext in app.config['ALLOWED_EXTENSIONS']])
     return render_template('index.html', languages=LANGUAGES, allowed_extensions=allowed_extensions)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    # 파일 업로드 처리
     if 'files[]' not in request.files:
         return jsonify({'error': 'No file was sent.'}), 400
     files = request.files.getlist('files[]')
@@ -100,6 +107,7 @@ def upload_file():
 
 @app.route('/delete_file/<file_id>', methods=['DELETE'])
 def delete_file(file_id):
+    # 파일 삭제 처리
     try:
         deleted_files = []
         for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
@@ -113,7 +121,7 @@ def delete_file(file_id):
             logging.info(f"Deleted files: {', '.join(deleted_files)}")
             return jsonify({'success': True, 'message': f'Files successfully deleted: {", ".join(deleted_files)}'}), 200
         else:
-            # If no files were found, log all files for debugging
+            # 파일을 찾지 못한 경우 디버깅을 위해 모든 파일 로깅
             for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
                 logging.info(f"Files in {folder}: {', '.join(os.listdir(folder))}")
             return jsonify({'success': False, 'error': 'File not found.'}), 404
@@ -123,6 +131,7 @@ def delete_file(file_id):
 
 @app.route('/start_translation', methods=['POST'])
 def start_translation():
+    # 번역 시작 처리
     data = request.json
     files = data.get('files', [])
     target_language = data.get('target_language')
@@ -130,7 +139,7 @@ def start_translation():
     if not files or not target_language:
         return jsonify({'error': 'Files or target language missing.'}), 400
 
-    # Check if the language is supported
+    # 지원하는 언어인지 확인
     if target_language not in LANGUAGES:
         return jsonify({'error': f'Unsupported language. Please choose one of the supported languages: {", ".join(LANGUAGES.keys())}'}), 400
 
@@ -150,6 +159,7 @@ def start_translation():
     return jsonify({'message': 'Translation started.'}), 200
 
 def split_text(text, max_length):
+    # 텍스트를 최대 길이에 맞춰 분할
     parts = []
     current_part = ""
 
@@ -167,6 +177,7 @@ def split_text(text, max_length):
     return parts
 
 def process_file(filepath, filename, target_language, file_id):
+    # 파일 처리 및 번역
     split_filenames = []
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -213,7 +224,7 @@ def process_file(filepath, filename, target_language, file_id):
             socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'Translating part {i}/{total_parts}...'})
             eventlet.sleep(0)
 
-        # Include file_id in the filename here
+        # 파일 이름에 file_id 포함
         translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}{original_extension}')
         translated_filepath = os.path.join(PROCESSED_FOLDER, translated_filename)
 
@@ -233,7 +244,7 @@ def process_file(filepath, filename, target_language, file_id):
         logging.error(f"File processing error ({filename}): {e}")
         socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'Error occurred: {str(e)}'})
     finally:
-        # Delete split files
+        # 분할된 파일 삭제
         for split_filename in split_filenames:
             try:
                 os.remove(os.path.join(PROCESSED_FOLDER, split_filename))
@@ -242,18 +253,19 @@ def process_file(filepath, filename, target_language, file_id):
 
 @app.route('/download/<filename>')
 def download_file(filename):
+    # 파일 다운로드 처리
     try:
         secure_name = secure_filename(filename)
         file_path = os.path.join(PROCESSED_FOLDER, secure_name)
 
-
+        # 경로 검증
         if not os.path.abspath(file_path).startswith(os.path.abspath(PROCESSED_FOLDER)) or '..' in filename:
             abort(404)
 
         if os.path.exists(file_path) and os.path.isfile(file_path):
             logging.info(f"Starting file download: {file_path}")
             
-            # Remove file_id from filename
+            # 파일 이름에서 file_id 제거
             base_filename, ext = os.path.splitext(secure_name)
             parts = base_filename.rsplit('_', 2)
             if len(parts) >= 3:
