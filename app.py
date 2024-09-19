@@ -12,7 +12,14 @@ from deep_translator import GoogleTranslator
 from flask_socketio import SocketIO
 from config import Config
 import csv
-import io
+from PyPDF2 import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from io import BytesIO
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTTextBox, LTChar, LTAnno
 
 # Flask 애플리케이션 초기화 및 설정
 app = Flask(__name__)
@@ -32,6 +39,9 @@ UPLOAD_FOLDER = app.config['UPLOAD_FOLDER']
 PROCESSED_FOLDER = app.config['PROCESSED_FOLDER']
 ALLOWED_EXTENSIONS = app.config['ALLOWED_EXTENSIONS']
 MAX_CHARS = app.config['MAX_CHARS']
+KOREAN_FONT_PATH = app.config['KOREAN_FONT_PATH']
+JAPANESE_FONT_PATH = app.config['JAPANESE_FONT_PATH']
+DEFAULT_FONT_PATH = app.config['DEFAULT_FONT_PATH']
 
 # 필요한 폴더 생성
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -227,11 +237,115 @@ def process_csv_file(filepath, filename, target_language, file_id):
         logging.error(f"CSV file processing error ({filename}): {e}")
         socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'Error occurred: {str(e)}'})
 
+def process_pdf_file(filepath, filename, target_language, file_id):
+    try:
+        pdf_reader = PdfReader(filepath)
+        pdf_writer = PdfWriter()
+
+        # 대상 언어에 따른 폰트 설정
+        font_path = get_font_path(target_language)
+        pdfmetrics.registerFont(TTFont('target_font', font_path))
+
+        translator = GoogleTranslator(source='auto', target=target_language)
+        
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 10, 'status': 'PDF에서 텍스트 추출 중...'})
+        eventlet.sleep(0)
+
+        total_pages = len(pdf_reader.pages)
+        for page_num, layout in enumerate(extract_pages(filepath)):
+            logging.info(f"페이지 {page_num + 1} 처리 시작")
+            # 새 페이지 생성
+            packet = BytesIO()
+            can = canvas.Canvas(packet)
+
+            # 원본 페이지의 크기 유지
+            page = pdf_reader.pages[page_num]
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+            can.setPageSize((width, height))
+
+            # 페이지의 각 텍스트 요소 처리
+            for element in layout:
+                if isinstance(element, LTTextBox):
+                    for text_line in element:
+                        text = ""
+                        for character in text_line:
+                            if isinstance(character, LTChar):
+                                text += character.get_text()
+                            elif isinstance(character, LTAnno):
+                                text += " "
+                        text = text.strip()
+                        if text:
+                            try:
+                                # 텍스트 번역
+                                translated_text = translator.translate(text)
+                                logging.info(f"번역 완료: {text} -> {translated_text}")
+
+                                # 원본 텍스트의 위치와 폰트 크기 가져오기
+                                x, y, font_name, font_size = get_text_properties(text_line)
+
+                                # 번역된 텍스트 그리기
+                                can.setFont('target_font', font_size)
+                                can.drawString(x, y, translated_text)
+                            except Exception as e:
+                                logging.error(f"텍스트 번역 중 오류 발생: {e}")
+
+            can.save()
+            packet.seek(0)
+            new_page = PdfReader(packet).pages[0]
+            
+            # 원본 페이지와 번역된 페이지 병합
+            page.merge_page(new_page)
+            pdf_writer.add_page(page)
+
+            progress = int((page_num + 1) / total_pages * 80) + 10
+            socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'페이지 {page_num + 1}/{total_pages} 처리 중...'})
+            eventlet.sleep(0)
+            logging.info(f"페이지 {page_num + 1} 처리 완료")
+
+        # 번역된 PDF 저장
+        base_filename = os.path.splitext(filename)[0]
+        translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}.pdf')
+        translated_filepath = os.path.join(PROCESSED_FOLDER, translated_filename)
+
+        with open(translated_filepath, 'wb') as f:
+            pdf_writer.write(f)
+
+        logging.info(f"번역된 PDF 파일 저장됨: {translated_filepath}")
+
+        socketio.emit('file_progress', {
+            'file_id': file_id,
+            'percentage': 100,
+            'status': '번역 완료!',
+            'download_filename': translated_filename
+        })
+
+    except Exception as e:
+        logging.error(f"PDF 파일 처리 오류 ({filename}): {e}")
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'오류 발생: {str(e)}'})
+
+def get_text_properties(text_line):
+    for char in text_line:
+        if isinstance(char, LTChar):
+            return char.x0, char.y1, char.fontname, char.size
+    return 0, 0, 'Helvetica', 12  # 기본값
+
+def get_font_path(target_language):
+    # 대상 언어에 따른 폰트 경로 반환
+    if target_language == 'ko':
+        return KOREAN_FONT_PATH
+    elif target_language == 'ja':
+        return JAPANESE_FONT_PATH
+    # 다른 언어에 대한 처리 추가
+    else:
+        return DEFAULT_FONT_PATH  # 기본 폰트 경로
+
 def process_file(filepath, filename, target_language, file_id):
-    # 파일 처리 및 번역
     try:
         if filename.lower().endswith('.csv'):
             process_csv_file(filepath, filename, target_language, file_id)
+        elif filename.lower().endswith('.pdf'):
+            process_pdf_file(filepath, filename, target_language, file_id)
         else:
             # 기존의 텍스트 파일 처리 로직
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -298,8 +412,8 @@ def process_file(filepath, filename, target_language, file_id):
         logging.error(f"File processing error ({filename}): {e}")
         socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'Error occurred: {str(e)}'})
     finally:
-        # 분할된 파일 삭제 (CSV 파일 처리 시에는 해당 없음)
-        if not filename.lower().endswith('.csv'):
+        # 분할된 파일 삭제 (CSV 파일과 PDF 파일 처리 시에는 해당 없음)
+        if not filename.lower().endswith(('.csv', '.pdf')):
             for split_filename in split_filenames:
                 try:
                     os.remove(os.path.join(PROCESSED_FOLDER, split_filename))

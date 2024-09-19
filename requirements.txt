@@ -2,3 +2,7 @@ Flask
 Flask-SocketIO
 deep-translator
 eventlet
+python-dotenv
+PyPDF2
+reportlab
+pdfminer.six
