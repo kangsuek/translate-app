@@ -6,3 +6,9 @@ python-dotenv
 PyPDF2
 reportlab
 pdfminer.six
+
+requests
+beautifulsoup4
+html2text
+markdown
+weasyprint

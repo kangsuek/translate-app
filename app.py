@@ -20,14 +20,16 @@ from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
 from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextBox, LTChar, LTAnno
+from reportlab.lib.colors import red, black
+import glob
 
 # Flask 애플리케이션 초기화 및 설정
 app = Flask(__name__)
 app.config.from_object(Config)
-logging.basicConfig(filename='logs/app.log', level=logging.DEBUG,
+logging.basicConfig(filename='logs/app.log', level=logging.INFO,
                     format='%(asctime)s %(levelname)s: %(message)s')
 
-app.config['SESSION_COOKIE_SECURE'] = False # 개발 환경에서만 사용하는 세션 쿠키 설정
+app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS 사용 시
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 
 # SocketIO 초기화
@@ -117,28 +119,27 @@ def upload_file():
         return jsonify({'error': 'No valid files were uploaded.'}), 400
     return jsonify({'files': uploaded_files}), 200
 
-@app.route('/delete_file/<file_id>', methods=['DELETE'])
 def delete_file(file_id):
     # 파일 삭제 처리
     try:
         deleted_files = []
         for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
-            for filename in os.listdir(folder):
-                if filename.startswith(file_id) or f"_{file_id}_" in filename:
-                    file_path = os.path.join(folder, filename)
-                    os.remove(file_path)
-                    deleted_files.append(filename)
+            pattern = os.path.join(folder, f"{file_id}*")
+            for file_path in glob.glob(pattern):
+                os.remove(file_path)
+                deleted_files.append(os.path.basename(file_path))
 
         if deleted_files:
             logging.info(f"Deleted files: {', '.join(deleted_files)}")
             return jsonify({'success': True, 'message': f'Files successfully deleted: {", ".join(deleted_files)}'}), 200
         else:
-            for folder in [UPLOAD_FOLDER, PROCESSED_FOLDER]:
-                logging.info(f"Files in {folder}: {', '.join(os.listdir(folder))}")
-            return jsonify({'success': False, 'error': 'File not found.'}), 404
+            return jsonify({'success': False, 'message': 'No files found to delete'}), 404
     except Exception as e:
-        logging.error(f"File deletion error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/delete_file/<file_id>', methods=['DELETE'])
+def delete_file_route(file_id):
+    return delete_file(file_id)
 
 @app.route('/start_translation', methods=['POST'])
 def start_translation():
@@ -279,17 +280,17 @@ def process_pdf_file(filepath, filename, target_language, file_id):
                             try:
                                 # 텍스트 번역
                                 translated_text = translator.translate(text)
-                                logging.info(f"번역 완료: {text} -> {translated_text}")
+                                # logging.info(f"번역 완료: {text} -> {translated_text}")
 
-                                # 원본 텍스트의 위치와 폰트 크기 가져오기
                                 x, y, font_name, font_size = get_text_properties(text_line)
 
-                                # 번역된 텍스트 그리기
+                                # 번역된 텍스트를 빨간색으로 그리기
                                 can.setFont('target_font', font_size)
+                                can.setFillColor(red)  # 텍스트 색상을 빨간색으로 설정
                                 can.drawString(x, y, translated_text)
+                                can.setFillColor(black)  # 다음 텍스트를 위해 색상을 다시 검정색으로 설정
                             except Exception as e:
                                 logging.error(f"텍스트 번역 중 오류 발생: {e}")
-
             can.save()
             packet.seek(0)
             new_page = PdfReader(packet).pages[0]
