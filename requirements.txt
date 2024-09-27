@@ -6,6 +6,7 @@ python-dotenv
 PyPDF2
 reportlab
 pdfminer.six
+nltk
 
 requests
 beautifulsoup4

@@ -22,6 +22,11 @@ from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextBox, LTChar, LTAnno
 from reportlab.lib.colors import red, black
 import glob
+from nltk.tokenize import sent_tokenize
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, Frame
+import nltk
+# nltk.download('punkt_tab')
 
 # Flask 애플리케이션 초기화 및 설정
 app = Flask(__name__)
@@ -265,32 +270,110 @@ def process_pdf_file(filepath, filename, target_language, file_id):
             height = float(page.mediabox.height)
             can.setPageSize((width, height))
 
-            # 페이지의 각 텍스트 요소 처리
+            # 비텍스트 요소 복사
+            for element in layout:
+                if isinstance(element, (LTImage, LTFigure)):
+                    # 이미지나 그래픽 요소의 위치와 크기 정보를 사용하여 원본에서 복사
+                    x, y, w, h = element.bbox
+                    can.saveState()
+                    can.translate(x, height - y - h)
+                    can.scale(1, -1)
+                    can.doForm('page[%d]' % page_num)
+                    can.restoreState()
+
+            # 텍스트 번역 및 그리기
             for element in layout:
                 if isinstance(element, LTTextBox):
-                    for text_line in element:
-                        text = ""
-                        for character in text_line:
-                            if isinstance(character, LTChar):
-                                text += character.get_text()
-                            elif isinstance(character, LTAnno):
-                                text += " "
-                        text = text.strip()
-                        if text:
-                            try:
-                                # 텍스트 번역
-                                translated_text = translator.translate(text)
-                                # logging.info(f"번역 완료: {text} -> {translated_text}")
+                    text = element.get_text().strip()
+                    if text:
+                        translated_text = translator.translate(text)
+                        bbox = element.bbox
+                        x, y, _, _ = bbox
+                        font_size = get_average_font_size(element)
+                        
+                        can.setFont('target_font', font_size)
+                        can.setFillColor(red)
+                        
+                        # 텍스트를 여러 줄로 나누어 그리기
+                        lines = wrap_text(translated_text, can, width - x)
+                        for i, line in enumerate(lines):
+                            can.drawString(x, height - y - i*font_size*1.2, line)
 
-                                x, y, font_name, font_size = get_text_properties(text_line)
+            can.save()
+            packet.seek(0)
+            new_page = PdfReader(packet).pages[0]
+            
+            pdf_writer.add_page(new_page)
 
-                                # 번역된 텍스트를 빨간색으로 그리기
-                                can.setFont('target_font', font_size)
-                                can.setFillColor(red)  # 텍스트 색상을 빨간색으로 설정
-                                can.drawString(x, y, translated_text)
-                                can.setFillColor(black)  # 다음 텍스트를 위해 색상을 다시 검정색으로 설정
-                            except Exception as e:
-                                logging.error(f"텍스트 번역 중 오류 발생: {e}")
+            progress = int((page_num + 1) / total_pages * 80) + 10
+            socketio.emit('file_progress', {'file_id': file_id, 'percentage': progress, 'status': f'페이지 {page_num + 1}/{total_pages} 처리 중...'})
+            eventlet.sleep(0)
+            logging.info(f"페이지 {page_num + 1} 처리 완료")
+
+        # 번역된 PDF 저장
+        base_filename = os.path.splitext(filename)[0]
+        translated_filename = sanitize_filename(f'{base_filename}_{file_id}_{target_language}.pdf')
+        translated_filepath = os.path.join(PROCESSED_FOLDER, translated_filename)
+
+        with open(translated_filepath, 'wb') as f:
+            pdf_writer.write(f)
+
+        logging.info(f"번역된 PDF 파일 저장됨: {translated_filepath}")
+
+        socketio.emit('file_progress', {
+            'file_id': file_id,
+            'percentage': 100,
+            'status': '번역 완료!',
+            'download_filename': translated_filename
+        })
+
+    except Exception as e:
+        logging.error(f"PDF 파일 처리 오류 ({filename}): {e}")
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'오류 발생: {str(e)}'})
+
+    try:
+        pdf_reader = PdfReader(filepath)
+        pdf_writer = PdfWriter()
+
+        # 대상 언어에 따른 폰트 설정
+        font_path = get_font_path(target_language)
+        pdfmetrics.registerFont(TTFont('target_font', font_path))
+
+        translator = GoogleTranslator(source='auto', target=target_language)
+        
+        socketio.emit('file_progress', {'file_id': file_id, 'percentage': 10, 'status': 'PDF에서 텍스트 추출 중...'})
+        eventlet.sleep(0)
+
+        total_pages = len(pdf_reader.pages)
+        for page_num, layout in enumerate(extract_pages(filepath)):
+            logging.info(f"페이지 {page_num + 1} 처리 시작")
+            # 새 페이지 생성
+            packet = BytesIO()
+            can = canvas.Canvas(packet)
+
+            # 원본 페이지의 크기 유지
+            page = pdf_reader.pages[page_num]
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+            can.setPageSize((width, height))
+
+            for element in layout:
+                if isinstance(element, LTTextBox):
+                    text = element.get_text().strip()
+                    if text:
+                        translated_text = translator.translate(text)
+                        bbox = element.bbox
+                        x, y, _, _ = bbox
+                        font_size = get_average_font_size(element)
+                        
+                        can.setFont('target_font', font_size)
+                        can.setFillColor(red)
+                        
+                        # 텍스트를 여러 줄로 나누어 그리기
+                        lines = wrap_text(translated_text, can, width - x)
+                        for i, line in enumerate(lines):
+                            can.drawString(x, height - y - i*font_size*1.2, line)
+
             can.save()
             packet.seek(0)
             new_page = PdfReader(packet).pages[0]
@@ -325,11 +408,24 @@ def process_pdf_file(filepath, filename, target_language, file_id):
         logging.error(f"PDF 파일 처리 오류 ({filename}): {e}")
         socketio.emit('file_progress', {'file_id': file_id, 'percentage': 0, 'status': f'오류 발생: {str(e)}'})
 
-def get_text_properties(text_line):
-    for char in text_line:
-        if isinstance(char, LTChar):
-            return char.x0, char.y1, char.fontname, char.size
-    return 0, 0, 'Helvetica', 12  # 기본값
+def get_average_font_size(textbox):
+    sizes = [char.size for char in textbox if isinstance(char, LTChar)]
+    return sum(sizes) / len(sizes) if sizes else 12
+
+def wrap_text(text, canvas, max_width):
+    words = text.split()
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        width = canvas.stringWidth(test_line)
+        if width <= max_width:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    lines.append(' '.join(current_line))
+    return lines
 
 def get_font_path(target_language):
     # 대상 언어에 따른 폰트 경로 반환
